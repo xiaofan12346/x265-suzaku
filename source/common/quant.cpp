@@ -640,7 +640,13 @@ uint32_t Quant::rdoQuant(const CUData& cu, int16_t* dstCoeff, TextType ttype, ui
 #define UNQUANT(lvl)    (((lvl) * (unquantScale[blkPos] << per) + unquantRound) >> unquantShift)
 #define SIGCOST(bits)   ((lambda2 * (bits)) >> 8)
 #define RDCOST(d, bits) ((((int64_t)d * d) << scaleBits) + SIGCOST(bits))
-#define PSYVALUE(rec)   ((psyScale * (rec)) >> X265_MAX(0, (2 * transformShift + 1)))
+/* Suzaku: 低频系数增强 psy-rdoq
+ * 高扫描位置（scanPos 大 = 低频系数）对平涂渐变区域至关重要
+ * 对这些系数的 psy-rdoq 权重提升 1.5 倍，减少量化截断
+ * numCoeff = trSize * trSize，在函数开头已定义 */
+#define PSYVALUE_BASE(rec) ((psyScale * (rec)) >> X265_MAX(0, (2 * transformShift + 1)))
+#define PSYVALUE(rec)      (scanPos >= (numCoeff * 3 / 4) ? \
+    (PSYVALUE_BASE(rec) * 3 / 2) : PSYVALUE_BASE(rec))
 
     int64_t costCoeff[trSize * trSize];   /* d*d + lambda * bits */
     int64_t costUncoded[trSize * trSize]; /* d*d + lambda * 0    */
