@@ -274,6 +274,7 @@ static const struct option long_options[] =
     { "no-info",              no_argument, NULL, 0 },
     { "zones",          required_argument, NULL, 0 },
     { "qpfile",         required_argument, NULL, 0 },
+    { "perceptual-map-file", required_argument, NULL, 0 },
     { "zonefile",       required_argument, NULL, 0 },
     { "no-zonefile-rc-init",  no_argument, NULL, 0 },
     { "lambda-file",    required_argument, NULL, 0 },
@@ -413,6 +414,10 @@ static const struct option long_options[] =
         ReconFile* recon[MAX_LAYERS];
         OutputFile* output;
         FILE*       qpfile;
+        FILE*       perceptualMapFile;
+        uint32_t    pmWidth, pmHeight, pmCtuSize, pmNumFrames;
+        int         pmCtusPerFrame;
+        float*      perceptualOffsets;
         FILE*       zoneFile;
         FILE*    dolbyVisionRpu;    /* File containing Dolby Vision BL RPU metadata */
         FILE*    scenecutAwareQpConfig; /* File containing scenecut aware frame quantization related CLI options */
@@ -461,6 +466,9 @@ static const struct option long_options[] =
                 inputfn[i] = NULL;
             output = NULL;
             qpfile = NULL;
+            perceptualMapFile = NULL;
+            perceptualOffsets = NULL;
+            pmCtusPerFrame = 0;
             zoneFile = NULL;
             dolbyVisionRpu = NULL;
             scenecutAwareQpConfig = NULL;

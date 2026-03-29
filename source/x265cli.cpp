@@ -467,6 +467,12 @@ namespace X265_NS {
         }
         if (qpfile)
             fclose(qpfile);
+        if (perceptualMapFile)
+            fclose(perceptualMapFile);
+        perceptualMapFile = NULL;
+        if (perceptualOffsets)
+            free(perceptualOffsets);
+        perceptualOffsets = NULL;
         qpfile = NULL;
         if (zoneFile)
             fclose(zoneFile);
@@ -797,6 +803,25 @@ namespace X265_NS {
                     this->qpfile = x265_fopen(optarg, "rb");
                     if (!this->qpfile)
                         x265_log_file(param, X265_LOG_ERROR, "%s qpfile not found or error in opening qp file\n", optarg);
+                }
+                OPT("perceptual-map-file")
+                {
+                    this->perceptualMapFile = x265_fopen(optarg, "rb");
+                    if (!this->perceptualMapFile)
+                    {
+                        x265_log_file(param, X265_LOG_ERROR, "perceptual map file %s not found\n", optarg);
+                        return true;
+                    }
+                    /* Read header */
+                    fread(&this->pmWidth, 4, 1, this->perceptualMapFile);
+                    fread(&this->pmHeight, 4, 1, this->perceptualMapFile);
+                    fread(&this->pmCtuSize, 4, 1, this->perceptualMapFile);
+                    fread(&this->pmNumFrames, 4, 1, this->perceptualMapFile);
+                    int pmRows = this->pmHeight / this->pmCtuSize;
+                    int pmCols = this->pmWidth / this->pmCtuSize;
+                    this->pmCtusPerFrame = pmRows * pmCols;
+                    x265_log_file(param, X265_LOG_INFO, "perceptual map: %dx%d, CTU=%d, %d frames, %d CTUs/frame\n",
+                        this->pmWidth, this->pmHeight, this->pmCtuSize, this->pmNumFrames, this->pmCtusPerFrame);
                 }
                 OPT("pme")
                 {

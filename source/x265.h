@@ -1848,6 +1848,8 @@ typedef struct x265_param
         The shared memory mode could only be used among the encoders running in parallel.
         Now only the cutree data could be shared among shared memory. More data would be support in the future.*/
         int       dataShareMode;
+        /* Suzaku: per-CTU perceptual importance map file path */
+        const char* perceptualMapFile;
 
         /* Unique shared memory name. Required if the shared memory mode enabled. NULL by default */
         char sharedMemName[X265_MAX_STRING_SIZE];

@@ -24,6 +24,7 @@
  *****************************************************************************/
 
 #include "common.h"
+#include <cstdio>
 #include "frame.h"
 #include "framedata.h"
 #include "picyuv.h"
@@ -637,6 +638,68 @@ void LookaheadTLD::calcAdaptiveQuantFrame(Frame *curFrame, x265_param* param)
                                 /* 高复杂度纹理区域：允许稍高 QP */
                                 double texture_factor = X265_MIN((norm_energy - gradient_threshold) / gradient_threshold, 1.0);
                                 base_adj += bias_strength * 0.3 * texture_factor;
+                            }
+
+                            /* Suzaku: 感知图谱融合 — 加载外部 per-CTU importance */
+                            if (param->rc.perceptualMapFile)
+                            {
+                                static FILE* pmFile = NULL;
+                                static float* pmBuffer = NULL;
+                                static int pmCtusPerFrame = 0;
+                                static int pmNumFrames = 0;
+                                static int pmWidth = 0, pmHeight = 0, pmCtuSize = 0;
+                                static int pmInitialized = 0;
+
+                                if (!pmInitialized)
+                                {
+                                    pmFile = fopen(param->rc.perceptualMapFile, "rb");
+                                    if (pmFile)
+                                    {
+                                        uint32_t w, h, cs, nf;
+                                        fread(&w, 4, 1, pmFile);
+                                        fread(&h, 4, 1, pmFile);
+                                        fread(&cs, 4, 1, pmFile);
+                                        fread(&nf, 4, 1, pmFile);
+                                        pmWidth = w; pmHeight = h; pmCtuSize = cs; pmNumFrames = nf;
+                                        pmCtusPerFrame = (pmHeight / pmCtuSize) * (pmWidth / pmCtuSize);
+                                        pmBuffer = (float*)malloc(pmCtusPerFrame * sizeof(float));
+                                        x265_log(param, X265_LOG_INFO,
+                                            "Perceptual map loaded: %dx%d CTU=%d frames=%d ctus/frame=%d\n",
+                                            pmWidth, pmHeight, pmCtuSize, pmNumFrames, pmCtusPerFrame);
+                                    }
+                                    pmInitialized = 1;
+                                }
+
+                                if (pmFile && pmBuffer && pmCtusPerFrame > 0)
+                                {
+                                    /* 读取当前帧对应的感知图谱（按采样帧率映射） */
+                                    int frameIdx = curFrame->m_poc;
+                                    int mapIdx = pmNumFrames > 1 ?
+                                        (frameIdx % pmNumFrames) : 0;
+
+                                    long offset = 16L + (long)mapIdx * pmCtusPerFrame * sizeof(float);
+                                    fseek(pmFile, offset, SEEK_SET);
+                                    fread(pmBuffer, sizeof(float), pmCtusPerFrame, pmFile);
+
+                                    /* 映射 blockXY → 感知图谱 CTU 索引 */
+                                    int ctuCols = pmWidth / pmCtuSize;
+                                    int blockRow = blockXY / maxCol;
+                                    int blockCol = blockXY % maxCol;
+                                    int ctuR = blockRow * loopIncr / pmCtuSize;
+                                    int ctuC = blockCol * loopIncr / pmCtuSize;
+                                    int ctuIdx = ctuR * ctuCols + ctuC;
+                                    if (ctuIdx >= pmCtusPerFrame) ctuIdx = pmCtusPerFrame - 1;
+                                    if (ctuIdx < 0) ctuIdx = 0;
+
+                                    float importance = pmBuffer[ctuIdx];
+
+                                    /* 感知重要性高的 CTU → 额外降 QP（更高质量）
+                                     * 范围控制: 最多 ±0.5 QP offset */
+                                    float pm_offset = -0.5f * (importance - 0.03f);
+                                    if (pm_offset < -0.5f) pm_offset = -0.5f;
+                                    if (pm_offset > 0.3f) pm_offset = 0.3f;
+                                    base_adj += pm_offset;
+                                }
                             }
 
                             qp_adj = base_adj;

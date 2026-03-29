@@ -1308,6 +1308,7 @@ int x265_param_parse(x265_param* p, const char* name, const char* value)
         p->rc.bStatWrite = pass & 1;
         p->rc.bStatRead = pass & 2;
         p->rc.dataShareMode = X265_SHARE_MODE_FILE;
+    p->rc.perceptualMapFile = NULL;
     }
     OPT("stats") snprintf(p->rc.statFileName, X265_MAX_STRING_SIZE, "%s", value);
     OPT("scaling-list") snprintf(p->scalingLists, X265_MAX_STRING_SIZE, "%s", value);

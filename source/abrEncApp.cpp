@@ -703,6 +703,8 @@ ret:
                         }
                         /* Overwrite PTS */
                         pic_in[view]->pts = pic_in[view]->poc;
+                        
+
 
                         // convert to field
                         if (m_param->bField && m_param->interlaceMode)
